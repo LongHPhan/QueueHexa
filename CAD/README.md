@@ -3,4 +3,4 @@ Both prototype 1 and 2 are fully functional with my current circuit and program.
 
 If you wished to use prototype 1, make sure your buck converter/UBEC/SBEC can provide a minimum of 15 amps.
 
-
+![Prototype 1](Images/Assembled_Prototype%201_Front_View.jpg)

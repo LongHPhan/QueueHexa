@@ -1,6 +1,6 @@
 # QueueHexa
 
-![Hexapod Bird View](Images/Bird_View_Hexa3.png)
+![Hexapod Bird View](Media/Bird_View_Hexa3.png)
 
 ## Purpose
 This is a personal robotics project created to hone my skills in CAD, electronics, and embedded programming. The idea is to design and build a six-legged hexapod robot from scratch: modeling, selecting the electronics, and programming custom inverse kinematics and gait control.

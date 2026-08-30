@@ -210,21 +210,11 @@ void UPDATE_LEG_PHASE(int leg_number,double moving_angle, int rotation_direction
   // moving angle is meant for omni movement, 0 means horizonntally right, 90 means straigth forward...
   //angle are already changed in GAIT();
 
-  //ROTATIONAL
+  //ROTATIONAL, only need z
   double ROTATION_Z = (rotation_direction * ROTATION_SPEED /2)*rotation_scale;
-  double ROTATION_X = (rotation_direction * ROTATION_SPEED /2)*rotation_scale;
-  if(leg_number == 3 || leg_number == 4){
-    ROTATION_X = 0;
-  }
-
-
   if (LEFT_SIDE[leg_number]) {
     ROTATION_Z = -ROTATION_Z;
   }
-  else{
-    ROTATION_X = -ROTATION_X;
-  }
-
 
   //If LEFT then direction = -1
   double X_DIRECTION = LEFT_SIDE[leg_number] ? -1 :1;
@@ -241,10 +231,10 @@ void UPDATE_LEG_PHASE(int leg_number,double moving_angle, int rotation_direction
   bool moving = movement_scale > 0 || rotation_scale > 0;
   double SWING_Y = moving ? STANCE_Y + LIFT_HEIGHT : STANCE_Y;
   double SWING_Z =  STANCE_Z + MOVEMENT_Z + ROTATION_Z;
-  double SWING_X = STANCE_X + MOVEMENT_X + ROTATION_X;
+  double SWING_X = STANCE_X + MOVEMENT_X;
 
   double PUSH_Z =  STANCE_Z - MOVEMENT_Z - ROTATION_Z;
-  double PUSH_X = STANCE_X -MOVEMENT_X-  ROTATION_X;
+  double PUSH_X = STANCE_X -MOVEMENT_X;
 
   if(PHASE_DONE[leg_number]){
     return;

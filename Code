@@ -9,7 +9,6 @@ XboxController controller;
 Adafruit_PWMServoDriver pwm1 = Adafruit_PWMServoDriver(0x40);
 Adafruit_PWMServoDriver pwm2 = Adafruit_PWMServoDriver(0x41);
 
-
 //go in clockwise
 #define COXA1  0
 #define FEMUR1 1
@@ -93,8 +92,6 @@ double LAW_COS(double A,double B,double C){
 //only the x position is needed to be flip
 bool LEFT_SIDE[7] = {false,true,false,false,true,true,false};
 
-
-
 void setAngle(uint8_t servo, double angle){
     int board = servo / 16;
     int channel = servo % 16;
@@ -142,7 +139,7 @@ void INVERSE_KINEMATICS(int leg_number,double x, double y, double z){
 }
 
 const double STEP_SIZE = 5;      // mm per update
-const unsigned long UPDATE_TIME = 30; // ms between updates
+const unsigned long UPDATE_TIME = 35; // ms between updates
 bool MOVE_TIP(int leg_number, double x, double y, double z) {
   //interpolate version of IK, return true when position is reached.
   //Otherwise, do action until its reached
@@ -175,14 +172,13 @@ bool MOVE_TIP(int leg_number, double x, double y, double z) {
   return false;
 }
 
-
 //************
 //GAIT MACHINE
 //************
 
 //how far forward and backward leg gonna
-const double STRIDE = 60;
-const double LIFT_HEIGHT = 20;
+const double STRIDE = 40;
+const double LIFT_HEIGHT = 15;
 //rougly half of stride for best result
 const double ROTATION_SPEED = 30;
 
@@ -203,7 +199,6 @@ bool PHASE_DONE[7] = {false,false,false,false,false,false,false};
 
 //rotational offset for the front and back needs to be shorten, since the shape is more of a rectangle.
 
-
 void UPDATE_LEG_PHASE(int leg_number,double moving_angle, int rotation_direction, double movement_scale, double rotation_scale){
   //responbile for the trajectory and current state of one leg
   //only tell when leg is done, not responsible for changing the state
@@ -219,11 +214,22 @@ void UPDATE_LEG_PHASE(int leg_number,double moving_angle, int rotation_direction
   //If LEFT then direction = -1
   double X_DIRECTION = LEFT_SIDE[leg_number] ? -1 :1;
 
-  //check if this affects while rotating
   double MOVEMENT_Z = (STRIDE/2)*sin(moving_angle)*movement_scale;
-
   double MOVEMENT_X = X_DIRECTION*(STRIDE/2)*cos(moving_angle)*movement_scale;
 
+  double LEG_ANGLE = 45.0*PI/180.0;
+  double X = MOVEMENT_X;
+  double Z = MOVEMENT_Z;
+  if (leg_number == 6 || leg_number == 5) {
+
+    MOVEMENT_X = X * cos(45 * PI / 180) + Z * sin(45 * PI / 180);
+    MOVEMENT_Z = -X * sin(45 * PI / 180) + Z * cos(45 * PI / 180);
+  }
+  else if(leg_number == 1 || leg_number == 2){
+
+    MOVEMENT_X = X * cos(LEG_ANGLE) - Z * sin(LEG_ANGLE);
+    MOVEMENT_Z = X * sin(LEG_ANGLE) + Z * cos(LEG_ANGLE);
+  }
 
   //X control left or right
   //Z control forward and back
@@ -234,7 +240,7 @@ void UPDATE_LEG_PHASE(int leg_number,double moving_angle, int rotation_direction
   double SWING_X = STANCE_X + MOVEMENT_X;
 
   double PUSH_Z =  STANCE_Z - MOVEMENT_Z - ROTATION_Z;
-  double PUSH_X = STANCE_X -MOVEMENT_X;
+  double PUSH_X = STANCE_X - MOVEMENT_X;
 
   if(PHASE_DONE[leg_number]){
     return;
@@ -257,18 +263,13 @@ void UPDATE_LEG_PHASE(int leg_number,double moving_angle, int rotation_direction
       if (MOVE_TIP(leg_number, SWING_X , STANCE_Y, SWING_Z)){
         PHASE_DONE[leg_number] = true;
       }
+      break;
 
     case PUSH:
       if (MOVE_TIP(leg_number, PUSH_X , STANCE_Y, PUSH_Z)) {
         PHASE_DONE[leg_number] = true;
       }
       break;
-  }
-}
-
-void RETURN_TO_STANCE(){
-  for(int i =1;i<=6;i++){
-    MOVE_TIP(i,STANCE_X,STANCE_Y,STANCE_Z);
   }
 }
 
@@ -345,13 +346,11 @@ void loop() {
     double rx = state.rightStickX;
     double ry = state.rightStickY;
 
-
-
     int rotation_direction = rx >= 0 ? CCW: CW;
 
     double left_stick_magnitude = sqrt(lx*lx + ly*ly);
     double right_stick_magnitude = sqrt(rx*rx + ry*ry);
-    
+   
     double movement_scale = 0;
     double rotation_scale = 0;
     if (left_stick_magnitude < 0.1) {
@@ -374,10 +373,8 @@ void loop() {
       rotation_scale = 1;
     }
 
-
     int angle = atan2(ly, lx) * 180.0 / PI;
     GAIT(angle,rotation_direction,movement_scale,rotation_scale);
-
   }
   else {
     Serial.println("Controller not connected");

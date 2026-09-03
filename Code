@@ -9,6 +9,7 @@ XboxController controller;
 Adafruit_PWMServoDriver pwm1 = Adafruit_PWMServoDriver(0x40);
 Adafruit_PWMServoDriver pwm2 = Adafruit_PWMServoDriver(0x41);
 
+
 //go in clockwise
 #define COXA1  0
 #define FEMUR1 1
@@ -172,6 +173,7 @@ bool MOVE_TIP(int leg_number, double x, double y, double z) {
   return false;
 }
 
+
 //************
 //GAIT MACHINE
 //************
@@ -197,50 +199,77 @@ enum ROTATION{
 PHASE LEG_PHASE[7] = {LIFT,LIFT,LOWER,LIFT,LOWER,LIFT,LOWER};
 bool PHASE_DONE[7] = {false,false,false,false,false,false,false};
 
-//rotational offset for the front and back needs to be shorten, since the shape is more of a rectangle.
+std::vector<double> CALCULATE_COORDINATE(int leg_number,double moving_angle, int rotation_direction, double movement_scale, double rotation_scale){
+  //Responsible for calculating the required tip coordinate using given movement and rotation offset.
 
-void UPDATE_LEG_PHASE(int leg_number,double moving_angle, int rotation_direction, double movement_scale, double rotation_scale){
-  //responbile for the trajectory and current state of one leg
-  //only tell when leg is done, not responsible for changing the state
-  // moving angle is meant for omni movement, 0 means horizonntally right, 90 means straigth forward...
-  //angle are already changed in GAIT();
-
-  //ROTATIONAL, only need z
+  //ROTATIONAL, only need z offset.
   double ROTATION_Z = (rotation_direction * ROTATION_SPEED /2)*rotation_scale;
   if (LEFT_SIDE[leg_number]) {
     ROTATION_Z = -ROTATION_Z;
   }
 
   //If LEFT then direction = -1
+  //For cases like moving_angle = 0
   double X_DIRECTION = LEFT_SIDE[leg_number] ? -1 :1;
-
-  double MOVEMENT_Z = (STRIDE/2)*sin(moving_angle)*movement_scale;
   double MOVEMENT_X = X_DIRECTION*(STRIDE/2)*cos(moving_angle)*movement_scale;
 
-  double LEG_ANGLE = 45.0*PI/180.0;
-  double X = MOVEMENT_X;
-  double Z = MOVEMENT_Z;
-  if (leg_number == 6 || leg_number == 5) {
+  double MOVEMENT_Z = (STRIDE/2)*sin(moving_angle)*movement_scale;
 
-    MOVEMENT_X = X * cos(45 * PI / 180) + Z * sin(45 * PI / 180);
-    MOVEMENT_Z = -X * sin(45 * PI / 180) + Z * cos(45 * PI / 180);
-  }
-  else if(leg_number == 1 || leg_number == 2){
+  //Used to account leg 1,2,5,6 rotatation at 45 degree from the horizontal.
+  double LEG_OFFSET = 45.0*PI/180.0;
+  if (leg_number == 1 || leg_number == 2 || leg_number == 5 || leg_number == 6) {
 
-    MOVEMENT_X = X * cos(LEG_ANGLE) - Z * sin(LEG_ANGLE);
-    MOVEMENT_Z = X * sin(LEG_ANGLE) + Z * cos(LEG_ANGLE);
+    double OLD_X = MOVEMENT_X;
+    double OLD_Z = MOVEMENT_Z;
+
+    double direction = (leg_number == 1 || leg_number == 2) ? 1.0 : -1.0;
+
+    MOVEMENT_X = OLD_X*cos(LEG_OFFSET) - direction*OLD_Z*sin(LEG_OFFSET);
+    MOVEMENT_Z = direction*OLD_X*sin(LEG_OFFSET)+OLD_Z*cos(LEG_OFFSET);
   }
 
   //X control left or right
   //Z control forward and back
+  double OFFSET_Z = MOVEMENT_Z + ROTATION_Z;
+  double OFFSET_X = MOVEMENT_X;
+
+  //Moving and rotating cuases the stride to overextend, this function normalize the stride to be about STRIDE/2
+  if (movement_scale > 0 && rotation_scale > 0) {
+    double magnitude = DISTANCE(0, 0, 0, OFFSET_X, 0, OFFSET_Z);
+    if (magnitude > 0) {
+        OFFSET_Z = (OFFSET_Z/magnitude)*(STRIDE/2);
+        OFFSET_X = (OFFSET_X /magnitude)*(STRIDE/2);
+    }
+  }
+
   //use for y, if both sticks are centered then y will stop
   bool moving = movement_scale > 0 || rotation_scale > 0;
   double SWING_Y = moving ? STANCE_Y + LIFT_HEIGHT : STANCE_Y;
-  double SWING_Z =  STANCE_Z + MOVEMENT_Z + ROTATION_Z;
-  double SWING_X = STANCE_X + MOVEMENT_X;
+  double SWING_Z = STANCE_Z + OFFSET_Z;
+  double SWING_X = STANCE_X + OFFSET_X;
 
-  double PUSH_Z =  STANCE_Z - MOVEMENT_Z - ROTATION_Z;
-  double PUSH_X = STANCE_X - MOVEMENT_X;
+  double PUSH_Z =  STANCE_Z - OFFSET_Z;
+  double PUSH_X = STANCE_X - OFFSET_X;
+
+  if(LEG_PHASE[leg_number] == PUSH){
+    return {PUSH_X,SWING_Y,PUSH_Z};
+  }
+  else{
+    return {SWING_X,SWING_Y,SWING_Z};
+  }
+}
+
+void UPDATE_LEG_PHASE(int leg_number,double moving_angle, int rotation_direction, double movement_scale, double rotation_scale){
+  //responbile for the trajectory and current state of one leg
+  //only tell when leg is done, not responsible for changing the state
+  // moving angle is meant for omni movement, 0 means horizonntally right, 90 means straigth forward...
+  //angle to degrees are already changed in GAIT();
+
+  std::vector<double> coordinates = CALCULATE_COORDINATE(leg_number, moving_angle, rotation_direction, movement_scale, rotation_scale);
+
+  double MOVING_X = coordinates[0];
+  double MOVING_Y = coordinates[1];
+  double MOVING_Z = coordinates[2];
 
   if(PHASE_DONE[leg_number]){
     return;
@@ -248,25 +277,25 @@ void UPDATE_LEG_PHASE(int leg_number,double moving_angle, int rotation_direction
   switch(LEG_PHASE[leg_number]){
     case LIFT:
       //repeats until true, how MOVE_TIP works
-      if (MOVE_TIP(leg_number, STANCE_X, SWING_Y, STANCE_Z)) {
+      if (MOVE_TIP(leg_number, STANCE_X, MOVING_Y, STANCE_Z)) {
         PHASE_DONE[leg_number] = true;
       }
       break;
 
     case SWING:
-      if (MOVE_TIP(leg_number,SWING_X , SWING_Y, SWING_Z)) {
+      if (MOVE_TIP(leg_number,MOVING_X , MOVING_Y, MOVING_Z)) {
           PHASE_DONE[leg_number] = true;
         }
         break;
 
     case LOWER:
-      if (MOVE_TIP(leg_number, SWING_X , STANCE_Y, SWING_Z)){
+      if (MOVE_TIP(leg_number, MOVING_X , STANCE_Y, MOVING_Z)){
         PHASE_DONE[leg_number] = true;
       }
       break;
 
     case PUSH:
-      if (MOVE_TIP(leg_number, PUSH_X , STANCE_Y, PUSH_Z)) {
+      if (MOVE_TIP(leg_number, MOVING_X , STANCE_Y, MOVING_Z)) {
         PHASE_DONE[leg_number] = true;
       }
       break;
@@ -285,16 +314,18 @@ PHASE NEXT_PHASE(int phase){
         case PUSH:  
           return LIFT;
     }
-    return LIFT; // should never happen
+
+    // should never happen
+    return LIFT;
 }
 
 void GAIT(double moving_angle, int rotation_direction, double movement_scale, double rotation_scale){
   //coordinate all 6 leg into specific pattern
   //tell when to change phase too
-  //gives angle to move
+  //gives which angle to move toward
   
   // convert degrees to radians
-  double angle_rad = moving_angle * PI / 180.0;
+  double angle_rad = moving_angle*PI/180.0;
 
   UPDATE_LEG_PHASE(1,angle_rad,rotation_direction, movement_scale, rotation_scale);
   UPDATE_LEG_PHASE(3,angle_rad,rotation_direction, movement_scale, rotation_scale);
@@ -320,7 +351,6 @@ void GAIT(double moving_angle, int rotation_direction, double movement_scale, do
   UPDATE_LEG_PHASE(2,angle_rad,rotation_direction, movement_scale, rotation_scale);
   UPDATE_LEG_PHASE(4,angle_rad,rotation_direction, movement_scale, rotation_scale);
   UPDATE_LEG_PHASE(6,angle_rad,rotation_direction, movement_scale, rotation_scale);
-
 }
 
 
@@ -337,47 +367,3 @@ void setup(){
 }
 
 void loop() {
-  if (controller.isConnected()) {
-    XboxControlsState state;
-    controller.read(&state);
-
-    double lx = state.leftStickX;
-    double ly = state.leftStickY;
-    double rx = state.rightStickX;
-    double ry = state.rightStickY;
-
-    int rotation_direction = rx >= 0 ? CCW: CW;
-
-    double left_stick_magnitude = sqrt(lx*lx + ly*ly);
-    double right_stick_magnitude = sqrt(rx*rx + ry*ry);
-   
-    double movement_scale = 0;
-    double rotation_scale = 0;
-    if (left_stick_magnitude < 0.1) {
-      movement_scale = 0;
-    }
-    else if (left_stick_magnitude < 0.5) {
-      movement_scale = 0.5;
-    }
-    else {
-      movement_scale = 1;
-    }
-
-    if (right_stick_magnitude < 0.1) {
-      rotation_scale = 0;
-    }
-    else if (right_stick_magnitude < 0.5) {
-      rotation_scale = 0.5;
-    }
-    else {
-      rotation_scale = 1;
-    }
-
-    int angle = atan2(ly, lx) * 180.0 / PI;
-    GAIT(angle,rotation_direction,movement_scale,rotation_scale);
-  }
-  else {
-    Serial.println("Controller not connected");
-  }
-  delay(10);
-}

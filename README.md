@@ -3,7 +3,7 @@
 ![Hexapod Bird View](Media/Bird_View_Hexa3.png)
 
 ## Demo Video
-  - [Demo Video]([https://github.com/yourusername/your-repo](https://youtu.be/oY_q5AbP_lc))
+  - [Hexapod Demo](https://youtu.be/oY_q5AbP_lc)
 
 ## Purpose
 This is a personal robotics project created to hone my skills in CAD, electronics, and embedded programming. The idea is to design and build a six-legged hexapod robot from scratch: modeling, selecting the electronics, and programming custom inverse kinematics and gait control.

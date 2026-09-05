@@ -6,9 +6,9 @@
 This is a personal robotics project created to hone my skills in CAD, electronics, and embedded programming. The idea is to design and build a six-legged hexapod robot from scratch: modeling, selecting the electronics, and programming custom inverse kinematics and gait control.
 
 ## Project Status
-**In Development**
+**In Development (Prototype Finished)**
 
-Planned improvements:
+Awaited improvements:
   - Add an accelerometer for motion/orientation feedback
   - Add leg position sensors
   - Integrate LiDAR for environmental sensing
